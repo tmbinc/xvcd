@@ -1,6 +1,6 @@
-CFLAGS=-Werror -Wall -Os
+CFLAGS=-Werror -Wall -Os -lftdi
 
 all: xvcd
 
-xvcd: gpio.o xvcd.o
+xvcd: io_ftdi.o xvcd.o
 	$(CC) -o $@ $^ $(CFLAGS)

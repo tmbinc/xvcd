@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include "gpio.h"
+#include "io_ftdi.h"
 
 static int jtag_state;
 static int verbose;
@@ -148,6 +148,7 @@ int handle_data(int fd)
 			if (verbose)
 				printf("ignoring bogus jtag state movement in jtag_state %d\n", jtag_state);
 		} else
+		{
 			for (i = 0; i < len; ++i)
 			{
 				//
@@ -155,18 +156,17 @@ int handle_data(int fd)
 				//
 				
 				int tms = !!(buffer[i/8] & (1<<(i&7)));
-				int tdi = !!(buffer[nr_bytes + i/8] & (1<<(i&7)));
-				result[i / 8] |= gpio_get(GPIO_TDO) << (i&7);
-				gpio_set(GPIO_TMS, tms);
-				gpio_set(GPIO_TDI, tdi);
-				gpio_set(GPIO_TCK, 1);
-				gpio_set(GPIO_TCK, 0);
-				
 				//
 				// Track the state.
 				//
 				jtag_state = jtag_step(jtag_state, tms);
 			}
+			if (io_scan(buffer, buffer + nr_bytes, result, len) < 0)
+			{
+				fprintf(stderr, "io_scan failed\n");
+				exit(1);
+			}
+		}
 
 		if (write(fd, result, nr_bytes) != nr_bytes)
 		{
@@ -202,12 +202,11 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	
-	//
-	// Initialize GPIOs (mapping them into the process, 
-	// re-setting alternate functions, making input/outputs).
-	//
-	
-	gpio_init();
+	if (io_init())
+	{
+		fprintf(stderr, "io_init failed\n");
+		return 1;
+	}
 	
 	//
 	// Listen on port 2542.
@@ -324,8 +323,7 @@ int main(int argc, char **argv)
 	//
 	// Un-map IOs.
 	//
-	
-	gpio_close();
+	io_close();
 	
 	return 0;
 }

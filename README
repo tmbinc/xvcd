@@ -1,20 +1,9 @@
 This is a daemon that listens to "xilinx_xvc" (xilinx virtual cable) traffic and 
-operates JTAG over GPIOs.
+operates JTAG over an FTDI in bitbang mode.
 
-It was written for the NeTV, but the NeTV silvermoon hardware doesn't have the 
-necessary GPIO-to-JTAG connections.
-
-I've chosen the following connections:
-
-TDI - GPIO104  - SPARE_IO1 (J102, test point)
-TDO - GPIO35   - MMC3_ALT_CMD (available on RP116, bottom)
-TCK - GPIO118  - FPGA_CCLK (available between R800 and R801, shared with serial configuration)
-TMS - GPIO36   - MMC3_ALT_CLK (available on RP116, bottom)
-
-You should easily be able to make it support other hardware as well.
-
-The daemon listens on port 2542, and multiplexes between multiple connections.
-
-I've tested Impact FPGA Programming, IDCODE looping, and Chipscope.
+This version is hardcoded to use an FTDI cable with an FT2232C chip. It does
+not use MPSSE but rather bitbang mode. It uses ftdi_write_async which might
+not be available on your platform. You can use the (much slower) non-async
+version instead.
 
 Have fun!

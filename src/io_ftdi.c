@@ -31,6 +31,14 @@ int io_init(void)
 		fprintf(stderr, "ftdi_init: %d (%s)\n", res, ftdi_get_error_string(&ftdi));
 		return 1;
 	}
+
+	res = ftdi_set_interface(&ftdi, INTERFACE_B);
+
+	if (res < 0) 
+	{
+		fprintf(stderr, "ftdi_set_interface: %d (%s)\n", res, ftdi_get_error_string(&ftdi));
+		return 1;
+	}
 	
 	res = ftdi_usb_open(&ftdi, 0x0403, 0x6010);
 	
@@ -41,8 +49,7 @@ int io_init(void)
 		return 1;
 	}
 	
-	ftdi_set_bitmode(&ftdi, 0xFF, BITMODE_CBUS);
-	res = ftdi_set_bitmode(&ftdi, IO_OUTPUT, BITMODE_SYNCBB);
+	res = ftdi_set_bitmode(&ftdi, IO_OUTPUT, BITMODE_MPSSE);
 	
 	if (res < 0)
 	{
@@ -74,19 +81,21 @@ int io_init(void)
 
 int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *TDO, int bits)
 {
-	unsigned char buffer[16384];
+#define B 7
+#define RB 1
+	unsigned char buffer[8192 * B];
 	int i, res; 
 #ifndef USE_ASYNC
 #error no async
 	int r, t;
 #endif
 	
-	if (bits > sizeof(buffer)/2)
+	if (bits * B > sizeof(buffer))
 	{
 		fprintf(stderr, "FATAL: out of buffer space for %d bits\n", bits);
 		return -1;
 	}
-	
+
 	for (i = 0; i < bits; ++i)
 	{
 		unsigned char v = 0;
@@ -94,16 +103,21 @@ int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *T
 			v |= PORT_TMS;
 		if (TDI[i/8] & (1<<(i&7)))
 			v |= PORT_TDI;
-		buffer[i * 2 + 0] = v;
-		buffer[i * 2 + 1] = v | PORT_TCK;
+		buffer[i * B + 0] = 0x80;
+		buffer[i * B + 1] = v;
+		buffer[i * B + 2] = IO_OUTPUT;
+		buffer[i * B + 3] = 0x81;
+		buffer[i * B + 4] = 0x80;
+		buffer[i * B + 5] = v | PORT_TCK;
+		buffer[i * B + 6] = IO_OUTPUT;
 	}
 
 #ifndef USE_ASYNC
 	r = 0;
-	
-	while (r < bits * 2)
+#error broken
+	while (r < bits * B)
 	{
-		t = bits * 2 - r;
+		t = bits * B - r;
 		if (t > FTDI_MAX_WRITESIZE)
 			t = FTDI_MAX_WRITESIZE;
 		
@@ -134,7 +148,7 @@ int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *T
 		r += t;
 	}
 #else
-	res = ftdi_write_data_async(&ftdi, buffer, bits * 2);
+	res = ftdi_write_data_async(&ftdi, buffer, bits * B);
 	if (res < 0)
 	{
 		fprintf(stderr, "ftdi_write_data_async %d (%s)\n", res, ftdi_get_error_string(&ftdi));
@@ -143,9 +157,9 @@ int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *T
 
 	i = 0;
 	
-	while (i < bits * 2)
+	while (i < bits * RB)
 	{
-		res = ftdi_read_data(&ftdi, buffer + i, bits * 2 - i);
+		res = ftdi_read_data(&ftdi, buffer + i, bits * RB - i);
 
 		if (res < 0)
 		{
@@ -161,7 +175,7 @@ int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *T
 	
 	for (i = 0; i < bits; ++i)
 	{
-		if (buffer[i * 2 + 1] & PORT_TDO)
+		if (buffer[i * RB] & PORT_TDO)
 		{
 			TDO[i/8] |= 1 << (i&7);
 		}

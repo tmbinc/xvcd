@@ -187,22 +187,33 @@ int main(int argc, char **argv)
 	int i;
 	int s;
 	int c;
+	int port = 2542;
+	int product = -1, vendor = -1;
 	struct sockaddr_in address;
 	
 	opterr = 0;
 	
-	while ((c = getopt(argc, argv, "v")) != -1)
+	while ((c = getopt(argc, argv, "vV:P:p:")) != -1)
 		switch (c)
 		{
+		case 'p':
+			port = strtoul(optarg, NULL, 0);
+			break;
+		case 'V':
+			vendor = strtoul(optarg, NULL, 0);
+			break;
+		case 'P':
+			product = strtoul(optarg, NULL, 0);
+			break;
 		case 'v':
 			verbose = 1;
 			break;
 		case '?':
-			fprintf(stderr, "usage: %s [-v]\n", *argv);
+			fprintf(stderr, "usage: %s [-v] [-V vendor] [-P product] [-p port]\n", *argv);
 			return 1;
 		}
 	
-	if (io_init())
+	if (io_init(product, vendor))
 	{
 		fprintf(stderr, "io_init failed\n");
 		return 1;
@@ -224,7 +235,7 @@ int main(int argc, char **argv)
 	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &i, sizeof i);
 	
 	address.sin_addr.s_addr = INADDR_ANY;
-	address.sin_port = htons(2542);
+	address.sin_port = htons(port);
 	address.sin_family = AF_INET;
 	
 	if (bind(s, (struct sockaddr*)&address, sizeof(address)) < 0)
@@ -246,6 +257,9 @@ int main(int argc, char **argv)
 	FD_SET(s, &conn);
 	
 	maxfd = s;
+
+	if (verbose)
+		printf("waiting for connection on port %d...\n", port);
 	
 	while (1)
 	{

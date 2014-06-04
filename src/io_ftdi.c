@@ -20,9 +20,13 @@ struct ftdi_context ftdi;
 
 void io_close(void);
 
-int io_init(void)
+int io_init(int product, int vendor)
 {
 	int res;
+	if (product < 0)
+		product = 0x6010;
+	if (vendor < 0)
+		vendor = 0x0403;
 	
 	res = ftdi_init(&ftdi);
 	
@@ -32,11 +36,11 @@ int io_init(void)
 		return 1;
 	}
 	
-	res = ftdi_usb_open(&ftdi, 0x0403, 0x6010);
+	res = ftdi_usb_open(&ftdi, vendor, product);
 	
 	if (res < 0)
 	{
-		fprintf(stderr, "ftdi_usb_open: %d (%s)\n", res, ftdi_get_error_string(&ftdi));
+		fprintf(stderr, "ftdi_usb_open(0x%04x, 0x%04x): %d (%s)\n", vendor, product, res, ftdi_get_error_string(&ftdi));
 		ftdi_deinit(&ftdi);
 		return 1;
 	}

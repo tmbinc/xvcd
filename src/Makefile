@@ -1,6 +1,19 @@
+O ?= .
+OBJ ?= $(O)/obj
 CFLAGS=-Werror -Wall -Os -lftdi
 
-all: xvcd
+all: $(O) $(O)/xvcd
 
-xvcd: io_ftdi.o xvcd.o
+.PHONY: $(O) $(OBJ)
+
+$(O):
+	mkdir -p $(O)
+
+$(OBJ):
+	mkdir -p $(OBJ)
+
+$(O)/xvcd: $(OBJ)/io_ftdi.o $(OBJ)/xvcd.o
 	$(CC) -o $@ $^ $(CFLAGS)
+
+$(OBJ)/%.o: %.c $(OBJ) io_ftdi.h
+	$(CC) -c $< -o $@ $(CFLAGS)

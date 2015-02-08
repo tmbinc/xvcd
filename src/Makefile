@@ -1,6 +1,6 @@
 O ?= .
 OBJ ?= $(O)/obj
-CFLAGS=-Werror -Wall -Os -lftdi
+CFLAGS=-Werror -Wall -Os -g -lftdi
 
 all: $(O) $(O)/xvcd
 

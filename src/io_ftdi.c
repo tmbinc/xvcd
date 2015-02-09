@@ -78,7 +78,7 @@ int io_init(int product, int vendor)
 
 int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *TDO, int bits)
 {
-	unsigned char buffer[16384];
+	unsigned char buffer[2*16384];
 	int i, res; 
 #ifndef USE_ASYNC
 #error no async

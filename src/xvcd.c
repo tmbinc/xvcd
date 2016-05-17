@@ -10,22 +10,9 @@
 #include <netinet/in.h>
 #include <ifaddrs.h>
 
-#include "io_ftdi.h"
+#include <wiringPi.h>
 
-
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-
-// Maximum input vector size in bytes. TMS and TDI byte size combined.
-//
-// Only tested with 4232H FTDI device which has a 2048 FIFO size. Not
-// sure but this may need to be reduced for older devices with smaller
-// FIFO sizes. It should not matter but try different values here if
-// cannot get Xilinx device to successfully reprogram.
-//
-// NOTE: Did test this with the value 4096 with a FT4232H device and
-// the Xilinx device failed to program.
-#define VECTOR_IN_SZ 2048
+#include "gpio.h"
 
 static int jtag_state;
 static int vlevel = 0;

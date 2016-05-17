@@ -1,6 +1,7 @@
 O ?= .
 OBJ ?= $(O)/obj
-CFLAGS=-Werror -Wall -Os -g -lftdi
+CFLAGS=-Werror -Wall -Os -g -lwiringPi -lwiringPiDev -lpthread
+LDFLAGS=
 
 all: $(O) $(O)/xvcd
 
@@ -12,8 +13,8 @@ $(O):
 $(OBJ):
 	mkdir -p $(OBJ)
 
-$(O)/xvcd: $(OBJ)/io_ftdi.o $(OBJ)/xvcd.o
+$(O)/xvcd: $(OBJ)/gpio.o $(OBJ)/xvcd.o
 	$(CC) -o $@ $^ $(CFLAGS)
 
-$(OBJ)/%.o: %.c $(OBJ) io_ftdi.h
+$(OBJ)/%.o: %.c $(OBJ)
 	$(CC) -c $< -o $@ $(CFLAGS)

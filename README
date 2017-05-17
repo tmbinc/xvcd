@@ -6,4 +6,8 @@ not use MPSSE but rather bitbang mode. It uses ftdi_write_async which might
 not be available on your platform. You can use the (much slower) non-async
 version instead.
 
+To use with vivado, use the following tcl command:
+
+open_hw_target -xvc_url localhost:2542
+
 Have fun!

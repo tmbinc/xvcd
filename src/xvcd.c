@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -56,18 +57,16 @@ static int jtag_step(int state, int tms)
 	return next_state[state][tms];
 }
 
-static int sread(int fd, void *target, int len)
-{
-	unsigned char *t = target;
-	while (len)
-	{
-		int r = read(fd, t, len);
-		if (r <= 0)
-			return r;
-		t += r;
-		len -= r;
-	}
-	return 1;
+static int sread(int fd, void *target, int len) {
+   unsigned char *t = target;
+   while (len) {
+      int r = read(fd, t, len);
+      if (r <= 0)
+         return r;
+      t += r;
+      len -= r;
+   }
+   return 1;
 }
 
 //
@@ -82,21 +81,56 @@ int handle_data(int fd)
 {
 	int i;
 	int seen_tlr = 0;
+const char xvcInfo[] = "xvcServer_v1.0:2048\n"; 
+
 
 	do
 	{
 		char cmd[16];
 		unsigned char buffer[2*2048], result[2*1024];
-		
-		if (sread(fd, cmd, 6) != 1)
+		memset(cmd, 0, 16);
+
+		if (sread(fd, cmd, 2) != 1)
 			return 1;
-		
-		if (memcmp(cmd, "shift:", 6))
-		{
-			cmd[6] = 0;
-			fprintf(stderr, "invalid cmd '%s'\n", cmd);
-			return 1;
+
+		if (memcmp(cmd, "ge", 2) == 0) {
+			if (sread(fd, cmd, 6) != 1)
+				return 1;
+			memcpy(result, xvcInfo, strlen(xvcInfo));
+			if (write(fd, result, strlen(xvcInfo)) != strlen(xvcInfo)) {
+				perror("write");
+				return 1;
+			}
+			if (verbose) {
+				printf("%u : Received command: 'getinfo'\n", (int)time(NULL));
+				printf("\t Replied with %s\n", xvcInfo);
+			}
+			break;
+		} else if (memcmp(cmd, "se", 2) == 0) {
+			if (sread(fd, cmd, 9) != 1)
+				return 1;
+			memcpy(result, cmd + 5, 4);
+			if (write(fd, result, 4) != 4) {
+				perror("write");
+				return 1;
+			}
+			if (verbose) {
+				printf("%u : Received command: 'settck'\n", (int)time(NULL));
+				printf("\t Replied with '%.*s'\n\n", 4, cmd + 5);
+			}
+			break;
+		} else if (memcmp(cmd, "sh", 2) == 0) {
+			if (sread(fd, cmd, 4) != 1)
+				return 1;
+			if (verbose) {
+				printf("%u : Received command: 'shift'\n", (int)time(NULL));
+			}
+		} else {
+
+			fprintf(stderr, "invalid cmd '%s'-ignoring\n", cmd);
+			return 0;
 		}
+		
 		
 		int len;
 		if (sread(fd, &len, 4) != 1)

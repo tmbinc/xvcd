@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include "gpio.h"
+#include "io_ftdi.h"
 
 static int jtag_state;
 static int verbose;
@@ -86,7 +86,7 @@ int handle_data(int fd)
 	do
 	{
 		char cmd[16];
-		unsigned char buffer[2048], result[1024];
+		unsigned char buffer[2*2048], result[2*1024];
 		
 		if (sread(fd, cmd, 6) != 1)
 			return 1;
@@ -148,6 +148,7 @@ int handle_data(int fd)
 			if (verbose)
 				printf("ignoring bogus jtag state movement in jtag_state %d\n", jtag_state);
 		} else
+		{
 			for (i = 0; i < len; ++i)
 			{
 				//
@@ -155,18 +156,17 @@ int handle_data(int fd)
 				//
 				
 				int tms = !!(buffer[i/8] & (1<<(i&7)));
-				int tdi = !!(buffer[nr_bytes + i/8] & (1<<(i&7)));
-				result[i / 8] |= gpio_get(GPIO_TDO) << (i&7);
-				gpio_set(GPIO_TMS, tms);
-				gpio_set(GPIO_TDI, tdi);
-				gpio_set(GPIO_TCK, 1);
-				gpio_set(GPIO_TCK, 0);
-				
 				//
 				// Track the state.
 				//
 				jtag_state = jtag_step(jtag_state, tms);
 			}
+			if (io_scan(buffer, buffer + nr_bytes, result, len) < 0)
+			{
+				fprintf(stderr, "io_scan failed\n");
+				exit(1);
+			}
+		}
 
 		if (write(fd, result, nr_bytes) != nr_bytes)
 		{
@@ -187,27 +187,37 @@ int main(int argc, char **argv)
 	int i;
 	int s;
 	int c;
+	int port = 2542;
+	int product = -1, vendor = -1;
 	struct sockaddr_in address;
 	
 	opterr = 0;
 	
-	while ((c = getopt(argc, argv, "v")) != -1)
+	while ((c = getopt(argc, argv, "vV:P:p:")) != -1)
 		switch (c)
 		{
+		case 'p':
+			port = strtoul(optarg, NULL, 0);
+			break;
+		case 'V':
+			vendor = strtoul(optarg, NULL, 0);
+			break;
+		case 'P':
+			product = strtoul(optarg, NULL, 0);
+			break;
 		case 'v':
 			verbose = 1;
 			break;
 		case '?':
-			fprintf(stderr, "usage: %s [-v]\n", *argv);
+			fprintf(stderr, "usage: %s [-v] [-V vendor] [-P product] [-p port]\n", *argv);
 			return 1;
 		}
 	
-	//
-	// Initialize GPIOs (mapping them into the process, 
-	// re-setting alternate functions, making input/outputs).
-	//
-	
-	gpio_init();
+	if (io_init(product, vendor))
+	{
+		fprintf(stderr, "io_init failed\n");
+		return 1;
+	}
 	
 	//
 	// Listen on port 2542.
@@ -225,7 +235,7 @@ int main(int argc, char **argv)
 	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &i, sizeof i);
 	
 	address.sin_addr.s_addr = INADDR_ANY;
-	address.sin_port = htons(2542);
+	address.sin_port = htons(port);
 	address.sin_family = AF_INET;
 	
 	if (bind(s, (struct sockaddr*)&address, sizeof(address)) < 0)
@@ -247,6 +257,9 @@ int main(int argc, char **argv)
 	FD_SET(s, &conn);
 	
 	maxfd = s;
+
+	if (verbose)
+		printf("waiting for connection on port %d...\n", port);
 	
 	while (1)
 	{
@@ -324,8 +337,7 @@ int main(int argc, char **argv)
 	//
 	// Un-map IOs.
 	//
-	
-	gpio_close();
+	io_close();
 	
 	return 0;
 }

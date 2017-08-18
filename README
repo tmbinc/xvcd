@@ -6,6 +6,9 @@ not use MPSSE but rather bitbang mode. It uses ftdi_write_async which might
 not be available on your platform. You can use the (much slower) non-async
 version instead.
 
+To run w/NanoEVB: enter bin dir and run `sudo ./xvcd`
+To run w/PicoEVB: enter bin dir and run `sudo ./xvcd -P 0x6015`
+
 To use with vivado, use the following tcl command:
 
 open_hw_target -xvc_url localhost:2542

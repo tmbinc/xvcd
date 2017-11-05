@@ -72,25 +72,25 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <LibraryPath>C:\Users\dr\git\xcvd2\xvcd2\libFTDI\Static\i386;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)\..\libFTDI\Static\i386;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)out\bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)out\int\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <LibraryPath>C:\Users\dr\git\xcvd2\xvcd2\libFTDI\Static\amd64;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)\..\libFTDI\Static\amd64;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)out\bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)out\int\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <LibraryPath>C:\Users\dr\git\xcvd2\xvcd2\libFTDI\Static\i386;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)\..\libFTDI\Static\i386;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)out\bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)out\int\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <LibraryPath>C:\Users\dr\git\xcvd2\xvcd2\libFTDI\Static\amd64;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)\..\libFTDI\Static\amd64;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)out\bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)out\int\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>

@@ -15,6 +15,9 @@
 static int jtag_state;
 static int verbose = 0;
 
+// temporary
+static LARGE_INTEGER sQPC_FREQ;
+
 
 
 //
@@ -85,11 +88,21 @@ int handle_data(int fd)
 {
 	int i;
 	int seen_tlr = 0;
-const char xvcInfo[] = "xvcServer_v1.0:2048\n"; 
+	const char xvcInfo[] = "xvcServer_v1.0:2048\n"; 
 
+	const bool TCP_DONT_DELAY = true;
+	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &TCP_DONT_DELAY, sizeof(TCP_DONT_DELAY)))
+	{
+		perror("Error disabling Nagle's algorithm");
+	}
 
+	LARGE_INTEGER qpc_times[10];
 	do
 	{
+		// Baseline
+		int qpc_inx = 0;
+		QueryPerformanceCounter(&qpc_times[qpc_inx++]);
+
 		char cmd[16];
 		unsigned char buffer[2*2048], result[2*1024];
 		memset(cmd, 0, 16);
@@ -142,6 +155,9 @@ const char xvcInfo[] = "xvcServer_v1.0:2048\n";
 			fprintf(stderr, "reading length failed\n");
 			return 1;
 		}
+
+		// Read socket complete
+		QueryPerformanceCounter(&qpc_times[qpc_inx++]);
 		
 		int nr_bytes = (len + 7) / 8;
 		if (nr_bytes * 2 > sizeof(buffer))
@@ -206,16 +222,36 @@ const char xvcInfo[] = "xvcServer_v1.0:2048\n";
 			}
 		}
 
+		// USB cycle complete
+		QueryPerformanceCounter(&qpc_times[qpc_inx++]);
+
 		if (send(fd, result, nr_bytes, 0) != nr_bytes)
 		{
 			perror("write");
 			return 1;
 		}
-		
+				
 		if (verbose)
 		{
 			printf("jtag state %d\n", jtag_state);
 		}
+
+		// send socket complete complete
+		QueryPerformanceCounter(&qpc_times[qpc_inx++]);
+
+
+#if 0
+		// Report
+		printf("(%5i) ", len);
+		for (int inx = 1; inx < qpc_inx; inx++)
+		{
+			LONGLONG elap = qpc_times[inx].QuadPart - qpc_times[inx-1].QuadPart;
+			elap *= 1000000;
+			elap /= sQPC_FREQ.QuadPart;
+			printf("%10lld", elap);
+		}
+		printf("\n");
+#endif
 	} while (!(seen_tlr && jtag_state == run_test_idle));
 	return 0;
 }
@@ -225,6 +261,8 @@ int main(int argc, char **argv)
 	int port = 2542;
 	int product = -1, vendor = -1;
 	struct sockaddr_in address;
+
+	QueryPerformanceFrequency(&sQPC_FREQ);
 	
 	
 	if (io_init(product, vendor))
@@ -264,6 +302,9 @@ int main(int argc, char **argv)
 	
 	const bool REUSE_SOCKET = true;
 	setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &REUSE_SOCKET, sizeof(REUSE_SOCKET));
+
+	const bool TCP_DONT_DELAY = true;
+	setsockopt(sock_fd, IPPROTO_TCP, TCP_NODELAY, &TCP_DONT_DELAY, sizeof(TCP_DONT_DELAY));
 	
 	address.sin_addr.s_addr = INADDR_ANY;
 	address.sin_port = htons(port);
@@ -326,7 +367,8 @@ int main(int argc, char **argv)
 					if (newfd < 0)
 					{
 						perror("accept");
-					} else
+					} 
+					else
 					{
 						if (newfd > maxfd)
 						{
@@ -334,6 +376,7 @@ int main(int argc, char **argv)
 						}
 						FD_SET(newfd, &conn);
 					}
+
 				}
 				//
 				// Otherwise, do work.

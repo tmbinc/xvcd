@@ -20,9 +20,11 @@ struct ftdi_context ftdi;
 
 void io_close(void);
 
-int io_init(int product, int vendor)
+int io_init(int product, int vendor, const char* desc)
 {
 	int res;
+
+   // Default product ID and vendor
 	if (product < 0)
 		product = 0x6010;
 	if (vendor < 0)
@@ -36,14 +38,28 @@ int io_init(int product, int vendor)
 		return 1;
 	}
 
-	res = ftdi_usb_open(&ftdi, vendor, product);
+   // Favor the description string over product/vendor
+   if (desc && (strlen(desc) > 0))
+   {
+      res = ftdi_usb_open_string(&ftdi, desc);
+      if (res < 0)
+      {
+         fprintf(stderr, "ftdi_usb_open (%s): %d (%s)\n", desc, res, ftdi_get_error_string(&ftdi));
+         ftdi_deinit(&ftdi);
+         return 1;
+      }
+   }
+   else
+   {
+      res = ftdi_usb_open(&ftdi, vendor, product);
+      if (res < 0)
+      {
+         fprintf(stderr, "ftdi_usb_open(0x%04x, 0x%04x): %d (%s)\n", vendor, product, res, ftdi_get_error_string(&ftdi));
+         ftdi_deinit(&ftdi);
+         return 1;
+      }
+   }
 
-	if (res < 0)
-	{
-		fprintf(stderr, "ftdi_usb_open(0x%04x, 0x%04x): %d (%s)\n", vendor, product, res, ftdi_get_error_string(&ftdi));
-		ftdi_deinit(&ftdi);
-		return 1;
-	}
 
 	ftdi_set_bitmode(&ftdi, 0xFF, BITMODE_CBUS);
 	res = ftdi_set_bitmode(&ftdi, IO_OUTPUT, BITMODE_SYNCBB);

@@ -223,31 +223,45 @@ int main(int argc, char **argv)
 	int c;
 	int port = 2542;
 	int product = -1, vendor = -1;
+   char* desc = NULL;
 	struct sockaddr_in address;
 	
 	opterr = 0;
-	
-	while ((c = getopt(argc, argv, "vV:P:p:")) != -1)
+
+   // Help string for the 's' flag
+   const char* sflag_desc = 
+      "\n  d:<devicenode> path of bus and device-node (e.g. \"003/001\") within usb device tree (usually at /proc/bus/usb/)"
+      "\n  i:<vendor>:<product> first device with given vendor and product id, ids can be decimal, octal (preceded by \"0\") or hex (preceded by \"0x\")"
+      "\n  i:<vendor>:<product>:<index> as above with index being the number of the device (starting with 0) if there are more than one"
+      "\n  s:<vendor>:<product>:<serial> first device with given vendor id, product id and serial string"
+      ;
+
+	while ((c = getopt(argc, argv, "vV:P:p:s:")) != -1)
+   {
 		switch (c)
-		{
-		case 'p':
-			port = strtoul(optarg, NULL, 0);
-			break;
-		case 'V':
-			vendor = strtoul(optarg, NULL, 0);
-			break;
-		case 'P':
-			product = strtoul(optarg, NULL, 0);
-			break;
-		case 'v':
-			verbose = 1;
-			break;
-		case '?':
-			fprintf(stderr, "usage: %s [-v] [-V vendor] [-P product] [-p port]\n", *argv);
-			return 1;
-		}
+      {
+      case 'p':
+         port = strtoul(optarg, NULL, 0);
+         break;
+      case 'V':
+         vendor = strtoul(optarg, NULL, 0);
+         break;
+      case 'P':
+         product = strtoul(optarg, NULL, 0);
+         break;
+      case 'v':
+         verbose = 1;
+         break;
+      case 's':
+         desc = optarg;
+         break;
+      case '?':
+         fprintf(stderr, "usage: %s [-v] [-V vendor] [-P product] [-p port] [-s <see below>]\n %s\n", *argv, sflag_desc);
+         return 1;
+      }
+   }
 	
-	if (io_init(product, vendor))
+	if (io_init(product, vendor, desc))
 	{
 		fprintf(stderr, "io_init failed\n");
 		return 1;

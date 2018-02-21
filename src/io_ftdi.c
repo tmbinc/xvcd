@@ -16,11 +16,25 @@
 #define FTDI_MAX_WRITESIZE 256
 #endif
 
+#define FTDI_BAUDRATE (750000)
 struct ftdi_context ftdi;
+static int vlevel = 0;
 
 void io_close(void);
 
-int io_init(int product, int vendor)
+// Pass in the selected FTDI device to be opened
+//
+// vendor: vendor ID of desired device, or -1 to use the default
+//
+// product: product ID of desired device, or -1 to use the default
+//
+// frequency: (in Hz) set TCK frequency - settck: command from the
+//            client is ignored. Pass in 0 to try to obey settck:
+//            commands.
+//
+// verbosity: 0 means no output, increase from 0 for more and more debugging output
+//
+int io_init(int vendor, int product, unsigned long frequency, int verbosity)
 {
 	int res;
 	if (product < 0)
@@ -28,6 +42,9 @@ int io_init(int product, int vendor)
 	if (vendor < 0)
 		vendor = 0x0403;
 	
+	// Save verbosity level
+	vlevel = verbosity;
+
 	res = ftdi_init(&ftdi);
 	
 	if (res < 0)
@@ -63,9 +80,9 @@ int io_init(int product, int vendor)
 		io_close();
 		return 1;
 	}
-	
-	res = ftdi_set_baudrate(&ftdi, 750000);
-	
+
+	res = ftdi_set_baudrate(&ftdi, FTDI_BAUDRATE);
+
 	if (res < 0)
 	{
 		fprintf(stderr, "ftdi_set_baudrate %d (%s)\n", res, ftdi_get_error_string(&ftdi));
@@ -75,6 +92,36 @@ int io_init(int product, int vendor)
 	
 	return 0;
 }
+
+// period - desired JTAG TCK period in ns
+//
+// return: if error, return an error code < 0
+//         if success, return the actual period in ns
+//
+int io_set_period(unsigned int period)
+{
+    int baudrate;
+    int actPeriod;
+    int res;
+
+    // Not completely sure this is the proper conversion rate between
+    // baudrate and period but believe it to be close.
+    baudrate =  25000000 / period;
+
+    res = ftdi_set_baudrate(&ftdi, baudrate);
+
+    if (res < 0)
+    {
+        fprintf(stderr, "ftdi_set_baudrate %d (%s)\n", res, ftdi_get_error_string(&ftdi));
+        return -1;
+    }
+
+
+    actPeriod = 25000000 / baudrate;
+
+    return  actPeriod;
+}
+
 
 int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *TDO, int bits)
 {
@@ -111,7 +158,7 @@ int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *T
 		if (t > FTDI_MAX_WRITESIZE)
 			t = FTDI_MAX_WRITESIZE;
 		
-		printf("writing %d bytes\n", t);
+		if (vlevel > 2) printf("writing %d bytes\n", t);
 		res = ftdi_write_data(&ftdi, buffer + r, t);
 
 		if (res != t)
@@ -129,7 +176,7 @@ int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *T
 			if (res < 0)
 			{
 				fprintf(stderr, "ftdi_read_data %d (%s)\n", res, ftdi_get_error_string(&ftdi));
-				return -1
+				return -1;
 			}
 			
 			i += res;

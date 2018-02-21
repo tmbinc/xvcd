@@ -6,7 +6,9 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
 #include <netinet/in.h>
+#include <ifaddrs.h>
 
 #include "io_ftdi.h"
 
@@ -442,11 +444,20 @@ int main(int argc, char **argv)
 						perror("accept");
 					} else
 					{
-						if (newfd > maxfd)
-						{
-							maxfd = newfd;
-						}
-						FD_SET(newfd, &conn);
+					    if (vlevel > 0) printf("setting TCP_NODELAY to 1\n");
+					    int flag = 1;
+					    int optResult = setsockopt(newfd,
+								       IPPROTO_TCP,
+								       TCP_NODELAY,
+								       (char *)&flag,
+								       sizeof(int));
+					    if (optResult < 0)
+						perror("TCP_NODELAY error");
+					    if (newfd > maxfd)
+					    {
+						maxfd = newfd;
+					    }
+					    FD_SET(newfd, &conn);
 					}
 				}
 				//

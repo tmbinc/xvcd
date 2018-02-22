@@ -76,28 +76,28 @@ static int jtag_step(int state, int tms)
 
 int32_t getInt32(unsigned char *data)
 {
-    // Return an int32_t from the received byte string, data. data is
-    // expected to be 4 bytes long.
-    int32_t num;
+	// Return an int32_t from the received byte string, data. data is
+	// expected to be 4 bytes long.
+	int32_t num;
 
-    // The int32 in data is sent little endian
-    num = data[3];
-    num = (num << 8) | data[2];
-    num = (num << 8) | data[1];
-    num = (num << 8) | data[0];
+	// The int32 in data is sent little endian
+	num = data[3];
+	num = (num << 8) | data[2];
+	num = (num << 8) | data[1];
+	num = (num << 8) | data[0];
 
-    return num;
+	return num;
 }
 
 void putInt32(unsigned char *data, int32_t num)
 {
-    // Convert the int32_t number, num, into a 4-byte, little endian
-    // string pointed to by data
+	// Convert the int32_t number, num, into a 4-byte, little endian
+	// string pointed to by data
 
-    data[0] = num & 0x00ff; num >>= 8;
-    data[1] = num & 0x00ff; num >>= 8;
-    data[2] = num & 0x00ff; num >>= 8;
-    data[3] = num & 0x00ff; num >>= 8;
+	data[0] = num & 0x00ff; num >>= 8;
+	data[1] = num & 0x00ff; num >>= 8;
+	data[2] = num & 0x00ff; num >>= 8;
+	data[3] = num & 0x00ff; num >>= 8;
 
 }
 
@@ -444,26 +444,26 @@ int main(int argc, char **argv)
 						perror("accept");
 					} else
 					{
-					    if (vlevel > 0) printf("setting TCP_NODELAY to 1\n");
-					    int flag = 1;
-					    int optResult = setsockopt(newfd,
-								       IPPROTO_TCP,
-								       TCP_NODELAY,
-								       (char *)&flag,
-								       sizeof(int));
-					    if (optResult < 0)
-						perror("TCP_NODELAY error");
-					    if (newfd > maxfd)
-					    {
-						maxfd = newfd;
-					    }
-					    FD_SET(newfd, &conn);
+						if (vlevel > 0) printf("setting TCP_NODELAY to 1\n");
+						int flag = 1;
+						int optResult = setsockopt(newfd,
+									   IPPROTO_TCP,
+									   TCP_NODELAY,
+									   (char *)&flag,
+									   sizeof(int));
+						if (optResult < 0)
+							perror("TCP_NODELAY error");
+						if (newfd > maxfd)
+						{
+							maxfd = newfd;
+						}
+						FD_SET(newfd, &conn);
 					}
 				}
 				//
 				// Otherwise, do work.
 				//
-                else if (handle_data(fd, frequency))
+				else if (handle_data(fd, frequency))
 				{
 					//
 					// Close connection when required.

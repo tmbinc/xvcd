@@ -100,26 +100,26 @@ int io_init(int vendor, int product, unsigned long frequency, int verbosity)
 //
 int io_set_period(unsigned int period)
 {
-    int baudrate;
-    int actPeriod;
-    int res;
+	int baudrate;
+	int actPeriod;
+	int res;
 
-    // Not completely sure this is the proper conversion rate between
-    // baudrate and period but believe it to be close.
-    baudrate =  25000000 / period;
+	// Not completely sure this is the proper conversion rate between
+	// baudrate and period but believe it to be close.
+	baudrate =  25000000 / period;
 
-    res = ftdi_set_baudrate(&ftdi, baudrate);
+	res = ftdi_set_baudrate(&ftdi, baudrate);
 
-    if (res < 0)
-    {
-        fprintf(stderr, "ftdi_set_baudrate %d (%s)\n", res, ftdi_get_error_string(&ftdi));
-        return -1;
-    }
+	if (res < 0)
+	{
+		fprintf(stderr, "ftdi_set_baudrate %d (%s)\n", res, ftdi_get_error_string(&ftdi));
+		return -1;
+	}
 
 
-    actPeriod = 25000000 / baudrate;
+	actPeriod = 25000000 / baudrate;
 
-    return  actPeriod;
+	return  actPeriod;
 }
 
 

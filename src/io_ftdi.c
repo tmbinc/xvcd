@@ -20,6 +20,13 @@
 //#define  USE_ASYNC
 //#define  USE_LIBFTDI1
 
+// Set the USB Latency Time to 4 ms, which seems to work well for
+// Raspberry Pi and Mac. However, can be overridden through Makefile,
+// if desired.
+#ifndef LATENCY_TIMER
+#define LATENCY_TIMER 4
+#endif
+
 #ifndef USE_ASYNC
 #define FTDI_MAX_WRITESIZE 256
 #endif
@@ -106,7 +113,19 @@ int io_init(int vendor, int product, const char* serial, unsigned int index, uns
 		ftdi_deinit(&ftdi);
 		return 1;
 	}
-	
+
+	// THIS IS VERY IMPORTANT for fast JTAG accesses. It speeds up
+	// JTAG programming roughly 3 times over the default latency timer
+	// setting. However, it might impact how well the host system
+	// works, so use with care. If find the host fails to handle other
+	// USB devices, increase this number or comment it out completely.
+	res = ftdi_set_latency_timer(&ftdi, (LATENCY_TIMER));
+	if (res < 0) {
+		fprintf(stderr, "Unable to set latency timer: %d (%s).\n", res, ftdi_get_error_string(&ftdi));
+		io_close();
+		return 1;
+	}
+
 	ftdi_set_bitmode(&ftdi, 0xFF, BITMODE_CBUS);
 	res = ftdi_set_bitmode(&ftdi, IO_OUTPUT, BITMODE_SYNCBB);
 	

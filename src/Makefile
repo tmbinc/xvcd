@@ -22,11 +22,30 @@
 #    make USE_SYNC=0 USE_LIBFTDI=0
 #
 #
+# If desire to change the USB Latency Timer value from the default
+# defined in io_ftdi.c, can do so by supplying it on the make command
+# line as seen below where the latency timer is being set to 6 ms. A
+# lower number may make the JTAG programming finish quicker but could
+# have a determental impact on the host system as it has to also
+# service the other USB devices. In some cases, the host system may
+# not be able to handle the default value and you may desire to
+# increase this value.
+#
+#    make LATENCY_TIMER=6
+#
+
 
 O ?= .
 OBJ ?= $(O)/obj
 
 BUILD_FLAGS=-Werror -Wall -Os
+
+# Can change LATENCY_TIMER value by including it on the make command as: LATENCY_TIMER=12
+ifdef LATENCY_TIMER
+   LATENCY=-DLATENCY_TIMER=$(LATENCY_TIMER)
+else
+   LATENCY=
+endif
 
 
 # Want USE_ASYNC to be the default
@@ -38,10 +57,10 @@ endif
 
 # Want libftdi1 to be the default
 ifdef USE_LIBFTDI
-   CFLAGS=$(BUILD_FLAGS) $(SYNC) -UUSE_LIBFTDI1
+   CFLAGS=$(BUILD_FLAGS) $(LATENCY) $(SYNC) -UUSE_LIBFTDI1
    LDFLAGS=$(BUILD_FLAGS) -lftdi
 else
-   CFLAGS=$(BUILD_FLAGS) $(SYNC) -DUSE_LIBFTDI1
+   CFLAGS=$(BUILD_FLAGS) $(LATENCY) $(SYNC) -DUSE_LIBFTDI1
    LDFLAGS=$(BUILD_FLAGS) -lftdi1
 endif
 

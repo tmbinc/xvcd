@@ -14,6 +14,21 @@
 
 #include "gpio.h"
 
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+// Maximum input vector size in bytes. TMS and TDI byte size combined.
+//
+// Only tested with 4232H FTDI device which has a 2048 FIFO size. Not
+// sure but this may need to be reduced for older devices with smaller
+// FIFO sizes. It should not matter but try different values here if
+// cannot get Xilinx device to successfully reprogram.
+//
+// NOTE: Did test this with the value 4096 with a FT4232H device and
+// the Xilinx device failed to program.
+#define VECTOR_IN_SZ 2048
+
 static int jtag_state;
 static int vlevel = 0;
 
@@ -110,7 +125,7 @@ static int sread(int fd, void *target, int len)
 //   after going test_logic_reset. This ensures that one
 //   client can't disrupt the other client's IR or state.
 //
-int handle_data(int fd, unsigned long frequency)
+int handle_data(int fd)
 {
 	int i;
 	int seen_tlr = 0;
@@ -150,17 +165,9 @@ int handle_data(int fd, unsigned long frequency)
 			// Convert the 4-byte little endian integer after "settck:" to be an integer
 			int32_t period, actPeriod;
 
-			// if frequency argument is non-0, use it instead of the
-			// period from the settck: command
-			if (frequency == 0)
-			{
-				period = getInt32((unsigned char*)cmd+5);
-			} else
-			{
-				period = 1000000000 / frequency;
-			}
+			period = getInt32((unsigned char*)cmd+5);
 
-			actPeriod = io_set_period((unsigned int)period);
+			actPeriod = period; // io_set_period((unsigned int)period);
 
 			if (actPeriod < 0)
 			{
@@ -267,15 +274,17 @@ int handle_data(int fd, unsigned long frequency)
 				//
 				
 				int tms = !!(buffer[i/8] & (1<<(i&7)));
+				int tdi = !!(buffer[nr_bytes + i/8] & (1<<(i&7)));
+				result[i / 8] |= gpio_get(GPIO_TDO) << (i&7);
+				gpio_set(GPIO_TMS, tms);
+				gpio_set(GPIO_TDI, tdi);
+				gpio_set(GPIO_TCK, 1);
+				gpio_set(GPIO_TCK, 0);
+
 				//
 				// Track the state.
 				//
 				jtag_state = jtag_step(jtag_state, tms);
-			}
-			if (io_scan(buffer, buffer + nr_bytes, result, len) < 0)
-			{
-				fprintf(stderr, "io_scan failed\n");
-				exit(1);
 			}
 
 			if (vlevel > 3) {
@@ -307,37 +316,23 @@ int main(int argc, char **argv)
 	int s;
 	int c;
 	int port = 2542;
-	int product = -1, vendor = -1;
-	unsigned long frequency = 0;
 	struct sockaddr_in address;
 	
 	opterr = 0;
 	
-	while ((c = getopt(argc, argv, "vV:P:p:f:")) != -1)
+	while ((c = getopt(argc, argv, "vp:")) != -1)
 		switch (c)
 		{
 		case 'p':
 			port = strtoul(optarg, NULL, 0);
 			break;
-		case 'V':
-			vendor = strtoul(optarg, NULL, 0);
-			break;
-		case 'P':
-			product = strtoul(optarg, NULL, 0);
-			break;
 		case 'v':
 			vlevel++;
 			//printf ("verbosity level is %d\n", vlevel);
 			break;
-		case 'f':
-			frequency = strtoul(optarg, NULL, 0);
-			break;
 		case '?':
-			fprintf(stderr, "usage: %s [-v] [-V vendor] [-P product] [-f frequency] [-p port]\n", *argv);
+			fprintf(stderr, "usage: %s [-v] [-p port]\n", *argv);
 			fprintf(stderr, "          -v: verbosity, increase verbosity by adding more v's\n");
-			fprintf(stderr, "          -V: vendor ID, use to select the desired FTDI device if multiple on host. (default = 0x0403)\n");
-			fprintf(stderr, "          -P: product ID, use to select the desired FTDI device if multiple on host. (default = 0x6010)\n");
-			fprintf(stderr, "          -f: frequency in Hz, force TCK frequency. If set to 0, set from settck commands sent by client. (default = 0)\n");
 			fprintf(stderr, "          -p: TCP port, TCP port to listen for connections from client (default = %d)\n\n", port);
 			return 1;
 		}
@@ -346,13 +341,9 @@ int main(int argc, char **argv)
 	{
 		printf ("verbosity level is %d\n", vlevel);
 	}
-
-	if (io_init(vendor, product, frequency, vlevel))
-	{
-		fprintf(stderr, "io_init failed\n");
-		return 1;
-	}
 	
+	gpio_init();
+
 	//
 	// Listen on port 2542.
 	//
@@ -450,7 +441,7 @@ int main(int argc, char **argv)
 				//
 				// Otherwise, do work.
 				//
-				else if (handle_data(fd, frequency))
+				else if (handle_data(fd))
 				{
 					//
 					// Close connection when required.
@@ -480,7 +471,8 @@ int main(int argc, char **argv)
 	//
 	// Un-map IOs.
 	//
-	io_close();
+
+	gpio_close();
 	
 	return 0;
 }

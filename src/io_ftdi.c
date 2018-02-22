@@ -11,6 +11,7 @@
 #define IO_OUTPUT (PORT_TCK|PORT_TDI|PORT_TMS)
 
 #define USE_ASYNC
+#define USE_LIBFTDI1
 
 #ifndef USE_ASYNC
 #define FTDI_MAX_WRITESIZE 256
@@ -130,6 +131,8 @@ int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *T
 #ifndef USE_ASYNC
 #error no async
 	int r, t;
+#else 
+	void *vres;
 #endif
 	
 	if (bits > sizeof(buffer)/2)
@@ -185,12 +188,21 @@ int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *T
 		r += t;
 	}
 #else
+#ifdef USE_LIBFTDI1
+	vres = ftdi_write_data_submit(&ftdi, buffer, bits * 2);
+	if (!vres)
+	{
+		fprintf(stderr, "ftdi_write_data_submit (%s)\n", ftdi_get_error_string(&ftdi));
+		return -1;
+	}
+#else
 	res = ftdi_write_data_async(&ftdi, buffer, bits * 2);
 	if (res < 0)
 	{
 		fprintf(stderr, "ftdi_write_data_async %d (%s)\n", res, ftdi_get_error_string(&ftdi));
 		return -1;
 	}
+#endif
 
 	i = 0;
 	

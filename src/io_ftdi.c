@@ -1,6 +1,11 @@
 #include <stdio.h>
-#include <ftdi.h>
 #include <string.h>
+
+#ifdef USE_LIBFTDI1
+#include <libftdi1/ftdi.h>
+#else
+#include <ftdi.h>
+#endif
 
 #include "io_ftdi.h"
 
@@ -10,8 +15,10 @@
 #define PORT_TMS            0x08
 #define IO_OUTPUT (PORT_TCK|PORT_TDI|PORT_TMS)
 
-#define USE_ASYNC
-#define USE_LIBFTDI1
+// NOTE: Moved definitions to Makefile to make it easier to
+// build for different platforms.
+//#define  USE_ASYNC
+//#define  USE_LIBFTDI1
 
 #ifndef USE_ASYNC
 #define FTDI_MAX_WRITESIZE 256
@@ -29,15 +36,31 @@ void io_close(void);
 //
 // product: product ID of desired device, or -1 to use the default
 //
+// serial: string of FTDI serial number to match in case of multiple
+//         FTDI devices plugged into host with the same Vendor/Product
+//         IDs or NULL to select first device found.
+//
+// index: number starting at 0 to select FTDI device. Can be used
+//        instead of serial, but serial is a more definite match since
+//        index depends on how host numbers the devices. If both
+//        serial and index is given, index is ignored. Use a value of
+//        0 to select first FTDI device that is found.
+//
+// interface: starts at 0 and selects one of multiple "ports" in the
+//            selected device. For example, the FT4232H and FT2232H
+//            have multiple ports. If not used, simply pass in 0 and
+//            the first one, typically labeled "A", will be selected.
+//
 // frequency: (in Hz) set TCK frequency - settck: command from the
 //            client is ignored. Pass in 0 to try to obey settck:
 //            commands.
 //
 // verbosity: 0 means no output, increase from 0 for more and more debugging output
 //
-int io_init(int vendor, int product, unsigned long frequency, int verbosity)
+int io_init(int vendor, int product, const char* serial, unsigned int index, unsigned int interface, unsigned long frequency, int verbosity)
 {
 	int res;
+
 	if (product < 0)
 		product = 0x6010;
 	if (vendor < 0)
@@ -53,8 +76,29 @@ int io_init(int vendor, int product, unsigned long frequency, int verbosity)
 		fprintf(stderr, "ftdi_init: %d (%s)\n", res, ftdi_get_error_string(&ftdi));
 		return 1;
 	}
-	
-	res = ftdi_usb_open(&ftdi, vendor, product);
+
+	{
+		enum ftdi_interface selected_interface;
+		// Select interface - must be done before ftdi_usb_open
+		switch (interface) {
+		case 0: selected_interface = INTERFACE_A; break;
+		case 1: selected_interface = INTERFACE_B; break;
+		case 2: selected_interface = INTERFACE_C; break;
+		case 3: selected_interface = INTERFACE_D; break;
+		default: selected_interface = INTERFACE_ANY; break;
+		}
+
+		res = ftdi_set_interface(&ftdi, selected_interface);
+		if (res < 0) {
+			fprintf(stderr, "ftdi_set_interface(%d): %d (%s)\n", interface, res, ftdi_get_error_string(&ftdi));
+			ftdi_deinit(&ftdi);
+			return 1;
+		}
+	}
+
+	if (serial != NULL) index = 0; /* ignore index if serial is given */
+
+	res = ftdi_usb_open_desc_index(&ftdi, vendor, product, NULL, serial, index);
 	
 	if (res < 0)
 	{
@@ -129,10 +173,13 @@ int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *T
 	unsigned char buffer[2*16384];
 	int i, res; 
 #ifndef USE_ASYNC
-#error no async
 	int r, t;
 #else 
+#ifdef USE_LIBFTDI1
 	void *vres;
+#else
+	/* declarations for USE_ASYNC go here */
+#endif
 #endif
 	
 	if (bits > sizeof(buffer)/2)

@@ -320,13 +320,14 @@ int main(int argc, char **argv)
 	int s;
 	int c;
 	int port = 2542;
-	int product = -1, vendor = -1;
+	int product = -1, vendor = -1, index = 0, interface = 0;
 	unsigned long frequency = 0;
+	char * serial = NULL;
 	struct sockaddr_in address;
 	
 	opterr = 0;
 	
-	while ((c = getopt(argc, argv, "vV:P:p:f:")) != -1)
+	while ((c = getopt(argc, argv, "vV:P:S:I:i:p:f:")) != -1)
 		switch (c)
 		{
 		case 'p':
@@ -338,6 +339,15 @@ int main(int argc, char **argv)
 		case 'P':
 			product = strtoul(optarg, NULL, 0);
 			break;
+		case 'S':
+			serial = optarg;
+			break;
+		case 'I':
+			index = strtoul(optarg, NULL, 0);
+			break;
+		case 'i':
+			interface = strtoul(optarg, NULL, 0);
+			break;
 		case 'v':
 			vlevel++;
 			//printf ("verbosity level is %d\n", vlevel);
@@ -346,10 +356,15 @@ int main(int argc, char **argv)
 			frequency = strtoul(optarg, NULL, 0);
 			break;
 		case '?':
-			fprintf(stderr, "usage: %s [-v] [-V vendor] [-P product] [-f frequency] [-p port]\n", *argv);
+			fprintf(stderr, "usage: %s [-v] [-V vendor] [-P product] [-S serial] [-I index] [-i interface] [-f frequency] [-p port]\n\n", *argv);
 			fprintf(stderr, "          -v: verbosity, increase verbosity by adding more v's\n");
 			fprintf(stderr, "          -V: vendor ID, use to select the desired FTDI device if multiple on host. (default = 0x0403)\n");
 			fprintf(stderr, "          -P: product ID, use to select the desired FTDI device if multiple on host. (default = 0x6010)\n");
+			fprintf(stderr, "          -S: serial number, use to select the desired FTDI device if multiple devices with same vendor\n");
+			fprintf(stderr, "              and product IDs on host. \'lsusb -v\' can be used to find the serial numbers.\n");
+			fprintf(stderr, "          -I: USB index, use to select the desired FTDI device if multiple devices with same vendor\n");
+			fprintf(stderr, "              and product IDs on host. Can be used instead of -S but -S is more definitive. (default = 0)\n");
+			fprintf(stderr, "          -i: interface, select which \'port\' on the selected device to use if multiple port device. (default = 0)\n");
 			fprintf(stderr, "          -f: frequency in Hz, force TCK frequency. If set to 0, set from settck commands sent by client. (default = 0)\n");
 			fprintf(stderr, "          -p: TCP port, TCP port to listen for connections from client (default = %d)\n\n", port);
 			return 1;
@@ -360,7 +375,7 @@ int main(int argc, char **argv)
 		printf ("verbosity level is %d\n", vlevel);
 	}
 
-	if (io_init(vendor, product, frequency, vlevel))
+	if (io_init(vendor, product, serial, index, interface, frequency, vlevel))
 	{
 		fprintf(stderr, "io_init failed\n");
 		return 1;

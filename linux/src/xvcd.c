@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 	// Listen on port 2542.
 	//
 	
-	s = socket(AF_INET, SOCK_STREAM, 0);
+	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	
 	if (s < 0)
 	{
@@ -292,7 +292,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
-	if (listen(s, 0) < 0)
+	if (listen(s, 1) < 0)
 	{
 		perror("listen");
 		return 1;

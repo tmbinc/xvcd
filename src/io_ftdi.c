@@ -2,9 +2,9 @@
 #include <string.h>
 
 #ifdef USE_LIBFTDI1
-#include <libftdi1/ftdi.h>
+#include "libftdi1/ftdi.h"
 #else
-#include <ftdi.h>
+#include "ftdi.h"
 #endif
 
 #include "io_ftdi.h"
@@ -64,7 +64,7 @@ void io_close(void);
 //
 // verbosity: 0 means no output, increase from 0 for more and more debugging output
 //
-int io_init(int vendor, int product, const char* serial, unsigned int index, unsigned int interface, unsigned long frequency, int verbosity)
+int io_init(int vendor, int product, const char* serial, unsigned int index, unsigned int finterface, unsigned long frequency, int verbosity)
 {
 	int res;
 
@@ -87,7 +87,7 @@ int io_init(int vendor, int product, const char* serial, unsigned int index, uns
 	{
 		enum ftdi_interface selected_interface;
 		// Select interface - must be done before ftdi_usb_open
-		switch (interface) {
+		switch (finterface) {
 		case 0: selected_interface = INTERFACE_A; break;
 		case 1: selected_interface = INTERFACE_B; break;
 		case 2: selected_interface = INTERFACE_C; break;
@@ -97,7 +97,7 @@ int io_init(int vendor, int product, const char* serial, unsigned int index, uns
 
 		res = ftdi_set_interface(&ftdi, selected_interface);
 		if (res < 0) {
-			fprintf(stderr, "ftdi_set_interface(%d): %d (%s)\n", interface, res, ftdi_get_error_string(&ftdi));
+			fprintf(stderr, "ftdi_set_interface(%d): %d (%s)\n", finterface, res, ftdi_get_error_string(&ftdi));
 			ftdi_deinit(&ftdi);
 			return 1;
 		}

@@ -1,20 +1,26 @@
+#define _WIN32_WINNT 0x0501
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
 
+
+
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/tcp.h>
-#include <netinet/in.h>
-#include <ifaddrs.h>
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 
 #include "io_ftdi.h"
 
+//#pragma comment(lib, "Ws2_32.lib")
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
+
+typedef int int32_t;
 
 // Maximum input vector size in bytes. TMS and TDI byte size combined.
 //
@@ -100,7 +106,7 @@ void putInt32(unsigned char *data, int32_t num)
 	data[3] = num & 0x00ff; num >>= 8;
 
 }
-
+/*
 static int sread(int fd, void *target, int len)
 {
 	unsigned char *t = target;
@@ -114,7 +120,7 @@ static int sread(int fd, void *target, int len)
 	}
 	return 1;
 }
-
+*/
 //
 // handle_data(fd) handles JTAG shift instructions.
 //   To allow multiple programs to access the JTAG chain
@@ -123,7 +129,7 @@ static int sread(int fd, void *target, int len)
 //   after going test_logic_reset. This ensures that one
 //   client can't disrupt the other client's IR or state.
 //
-int handle_data(int fd, unsigned long frequency)
+int handle_data(SOCKET fd, unsigned long frequency)
 {
 	int i;
 	int seen_tlr = 0;
@@ -136,15 +142,15 @@ int handle_data(int fd, unsigned long frequency)
 		unsigned char buffer[VECTOR_IN_SZ], result[VECTOR_IN_SZ/2];
 		memset(cmd, 0, 16);
 
-		if (sread(fd, cmd, 2) != 1)
+		if (recv(fd, cmd, 2, 0) != 2)
 			return 1;
 
 		if (memcmp(cmd, "ge", 2) == 0)
 		{
-			if (sread(fd, cmd, 6) != 1)
+			if (recv(fd, cmd, 6, 0) != 6)
 				return 1;
 			memcpy(result, xvcInfo, strlen(xvcInfo));
-			if (write(fd, result, strlen(xvcInfo)) != strlen(xvcInfo))
+			if (send(fd, (char*)result, strlen(xvcInfo), 0) != strlen(xvcInfo))
 			{
 				perror("write");
 				return 1;
@@ -155,9 +161,9 @@ int handle_data(int fd, unsigned long frequency)
 				printf("\t Replied with %s\n", xvcInfo);
 			}
 			break;
-		} else if (memcmp(cmd, "se", 2) == 0)
+		} else if (memcmp(cmd, "se", 2) == 0)  // set freq
 		{
-			if (sread(fd, cmd, 9) != 1)
+			if (recv(fd, cmd, 9, 0) != 9)
 				return 1;
 
 			// Convert the 4-byte little endian integer after "settck:" to be an integer
@@ -183,7 +189,7 @@ int handle_data(int fd, unsigned long frequency)
 
 			putInt32(result, actPeriod);
 
-			if (write(fd, result, 4) != 4)
+			if (send(fd, (char*)result, 4, 0) != 4)
 			{
 				perror("write");
 				return 1;
@@ -194,9 +200,9 @@ int handle_data(int fd, unsigned long frequency)
 				printf("\t Replied with '%d'\n\n", actPeriod);
 			}
 			break;
-		} else if (memcmp(cmd, "sh", 2) == 0)
+		} else if (memcmp(cmd, "sh", 2) == 0)  // shift
 		{
-			if (sread(fd, cmd, 4) != 1)
+			if (recv(fd, cmd, 4, 0) != 4)
 				return 1;
 			if (vlevel > 1)
 			{
@@ -209,7 +215,7 @@ int handle_data(int fd, unsigned long frequency)
 			return 1;
 		}
 		
-		if (sread(fd, cmd+6, 4) != 1)
+		if (recv(fd, cmd+6, 4, 0) != 4)   //length
 		{
 			fprintf(stderr, "reading length failed\n");
 			return 1;
@@ -225,7 +231,7 @@ int handle_data(int fd, unsigned long frequency)
 			return 1;
 		}
 		
-		if (sread(fd, buffer, nr_bytes * 2) != 1)
+		if (recv(fd, (char*)buffer, nr_bytes * 2, 0) != (nr_bytes * 2))
 		{
 			fprintf(stderr, "reading data failed\n");
 			return 1;
@@ -300,7 +306,7 @@ int handle_data(int fd, unsigned long frequency)
 			}
 		}
 
-		if (write(fd, result, nr_bytes) != nr_bytes)
+		if (send(fd, (char*)result, nr_bytes, 0) != nr_bytes)
 		{
 			perror("write");
 			return 1;
@@ -316,14 +322,21 @@ int handle_data(int fd, unsigned long frequency)
 
 int main(int argc, char **argv)
 {
-	int i;
-	int s;
+	//int i;
+	//int s;
 	int c;
 	int port = 2542;
-	int product = -1, vendor = -1, index = 0, interface = 0;
+	int product = -1, vendor = -1, index = 0, uinterface = 0;
 	unsigned long frequency = 0;
 	char * serial = NULL;
-	struct sockaddr_in address;
+	//struct sockaddr_in address;
+
+	WSADATA wsaData;
+	SOCKET ListenSocket = INVALID_SOCKET;
+	SOCKET ClientSocket = INVALID_SOCKET;
+
+	struct addrinfo hints;
+	struct addrinfo *result = NULL;
 	
 	opterr = 0;
 	
@@ -346,7 +359,7 @@ int main(int argc, char **argv)
 			index = strtoul(optarg, NULL, 0);
 			break;
 		case 'i':
-			interface = strtoul(optarg, NULL, 0);
+			uinterface = strtoul(optarg, NULL, 0);
 			break;
 		case 'v':
 			vlevel++;
@@ -375,7 +388,7 @@ int main(int argc, char **argv)
 		printf ("verbosity level is %d\n", vlevel);
 	}
 
-	if (io_init(vendor, product, serial, index, interface, frequency, vlevel))
+	if (io_init(vendor, product, serial, index, uinterface, frequency, vlevel))
 	{
 		fprintf(stderr, "io_init failed\n");
 		return 1;
@@ -384,131 +397,39 @@ int main(int argc, char **argv)
 	//
 	// Listen on port 2542.
 	//
-	
-	s = socket(AF_INET, SOCK_STREAM, 0);
-	
-	if (s < 0)
-	{
-		perror("socket");
-		return 1;
-	}
-	
-	i = 1;
-	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &i, sizeof i);
-	
-	address.sin_addr.s_addr = INADDR_ANY;
-	address.sin_port = htons(port);
-	address.sin_family = AF_INET;
-	
-	if (bind(s, (struct sockaddr*)&address, sizeof(address)) < 0)
-	{
-		perror("bind");
-		return 1;
-	}
-	
-	if (listen(s, 0) < 0)
-	{
-		perror("listen");
-		return 1;
-	}
-	
-	fd_set conn;
-	int maxfd = 0;
-	
-	FD_ZERO(&conn);
-	FD_SET(s, &conn);
-	
-	maxfd = s;
 
-	if (vlevel > 0)
-		printf("waiting for connection on port %d...\n", port);
+	WSAStartup(MAKEWORD(2,2), &wsaData);
+
+	ZeroMemory(&hints, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+	hints.ai_flags = AI_PASSIVE;
 	
-	while (1)
-	{
-		fd_set read = conn, except = conn;
-		int fd;
-		
-		//
-		// Look for work to do.
-		//
-		
-		if (select(maxfd + 1, &read, 0, &except, 0) < 0)
-		{
-			perror("select");
-			break;
-		}
-		
-		for (fd = 0; fd <= maxfd; ++fd)
-		{
-			if (FD_ISSET(fd, &read))
-			{
-				//
-				// Readable listen socket? Accept connection.
-				//
-				
-				if (fd == s)
-				{
-					int newfd;
-					socklen_t nsize = sizeof(address);
-					
-					newfd = accept(s, (struct sockaddr*)&address, &nsize);
-					if (vlevel > 0)
-						printf("connection accepted - fd %d\n", newfd);
-					if (newfd < 0)
-					{
-						perror("accept");
-					} else
-					{
-						if (vlevel > 0) printf("setting TCP_NODELAY to 1\n");
-						int flag = 1;
-						int optResult = setsockopt(newfd,
-									   IPPROTO_TCP,
-									   TCP_NODELAY,
-									   (char *)&flag,
-									   sizeof(int));
-						if (optResult < 0)
-							perror("TCP_NODELAY error");
-						if (newfd > maxfd)
-						{
-							maxfd = newfd;
-						}
-						FD_SET(newfd, &conn);
-					}
-				}
-				//
-				// Otherwise, do work.
-				//
-				else if (handle_data(fd, frequency))
-				{
-					//
-					// Close connection when required.
-					//
-					
-					if (vlevel > 0)
-						printf("connection closed - fd %d\n", fd);
-					close(fd);
-					FD_CLR(fd, &conn);
-				}
-			}
-			//
-			// Abort connection?
-			//
-			else if (FD_ISSET(fd, &except))
-			{
-				if (vlevel > 0)
-					printf("connection aborted - fd %d\n", fd);
-				close(fd);
-				FD_CLR(fd, &conn);
-				if (fd == s)
-					break;
-			}
-		}
-	}
+	getaddrinfo(NULL, "2542", &hints, &result);
+
+	ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+
+	bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
+
+	freeaddrinfo(result);
+
+	listen(ListenSocket, SOMAXCONN);
+
+	ClientSocket = accept(ListenSocket, NULL, NULL);
+
+	closesocket(ListenSocket);
+
+	handle_data(ClientSocket, frequency);
 	
 	//
 	// Un-map IOs.
 	//
 	io_close();
+
+	shutdown(ClientSocket, SD_SEND);
+	closesocket(ClientSocket);
+	WSACleanup();
 	
 	return 0;
 }

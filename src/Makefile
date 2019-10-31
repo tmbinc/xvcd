@@ -38,6 +38,7 @@
 O ?= .
 OBJ ?= $(O)/obj
 
+CC = gcc
 BUILD_FLAGS=-Werror -Wall -Os
 
 # Can change LATENCY_TIMER value by including it on the make command as: LATENCY_TIMER=12
@@ -61,7 +62,7 @@ ifdef USE_LIBFTDI
    LDFLAGS=$(BUILD_FLAGS) -lftdi
 else
    CFLAGS=$(BUILD_FLAGS) $(LATENCY) $(SYNC) -DUSE_LIBFTDI1
-   LDFLAGS=$(BUILD_FLAGS) -lftdi1
+   LDFLAGS=$(BUILD_FLAGS) -L/d/git/xvcd/src/libftdi1 -lftdi1 -lWs2_32
 endif
 
 all: $(O) $(O)/xvcd

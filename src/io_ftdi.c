@@ -13,7 +13,10 @@
 #define PORT_TDI            0x02
 #define PORT_TDO            0x04
 #define PORT_TMS            0x08
-#define IO_OUTPUT (PORT_TCK|PORT_TDI|PORT_TMS)
+#define PORT_MISC           0x90
+#define IO_OUTPUT (PORT_MISC|PORT_TCK|PORT_TDI|PORT_TMS)
+
+#define IO_DEFAULT_OUT     (0xe0)               /* Found to work best for some FTDI implementations */
 
 // NOTE: Moved definitions to Makefile to make it easier to
 // build for different platforms.
@@ -67,6 +70,7 @@ void io_close(void);
 int io_init(int vendor, int product, const char* serial, unsigned int index, unsigned int interface, unsigned long frequency, int verbosity)
 {
 	int res;
+	unsigned char buf[1];
 
 	if (product < 0)
 		product = 0x6010;
@@ -135,7 +139,15 @@ int io_init(int vendor, int product, const char* serial, unsigned int index, uns
 		io_close();
 		return 1;
 	}
-	
+
+	// Update state of outputs to the default
+	buf[0] = IO_DEFAULT_OUT;
+	res = ftdi_write_data(&ftdi, buf, 1);
+	if (res < 0)
+	{
+		fprintf(stderr, "write failed for 0x%x, error %d (%s)\n",buf[0], res, ftdi_get_error_string(&ftdi));
+	}
+
 	res = ftdi_usb_purge_buffers(&ftdi);
 	
 	if (res < 0)
@@ -209,7 +221,7 @@ int io_scan(const unsigned char *TMS, const unsigned char *TDI, unsigned char *T
 	
 	for (i = 0; i < bits; ++i)
 	{
-		unsigned char v = 0;
+		unsigned char v = IO_DEFAULT_OUT;
 		if (TMS[i/8] & (1<<(i&7)))
 			v |= PORT_TMS;
 		if (TDI[i/8] & (1<<(i&7)))

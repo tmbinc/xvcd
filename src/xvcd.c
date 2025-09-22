@@ -323,11 +323,12 @@ int main(int argc, char **argv)
 	int product = -1, vendor = -1, index = 0, interface = 0;
 	unsigned long frequency = 0;
 	char * serial = NULL;
+	int device = 0;
 	struct sockaddr_in address;
 	
 	opterr = 0;
 	
-	while ((c = getopt(argc, argv, "vV:P:S:I:i:p:f:")) != -1)
+	while ((c = getopt(argc, argv, "vV:P:S:I:i:p:f:D:")) != -1)
 		switch (c)
 		{
 		case 'p':
@@ -345,6 +346,16 @@ int main(int argc, char **argv)
 		case 'I':
 			index = strtoul(optarg, NULL, 0);
 			break;
+		case 'D':
+			if (strcmp(optarg, "FT2232C") == 0) {
+				device = 0;
+			} else if (strcmp(optarg, "FT2232H") == 0) {
+				device = 1;
+			} else {
+				fprintf(stderr, "device not supported.\n");
+				return 1;
+			}
+			break;
 		case 'i':
 			interface = strtoul(optarg, NULL, 0);
 			break;
@@ -356,7 +367,7 @@ int main(int argc, char **argv)
 			frequency = strtoul(optarg, NULL, 0);
 			break;
 		case '?':
-			fprintf(stderr, "usage: %s [-v] [-V vendor] [-P product] [-S serial] [-I index] [-i interface] [-f frequency] [-p port]\n\n", *argv);
+			fprintf(stderr, "usage: %s [-v] [-V vendor] [-P product] [-S serial] [-I index] [-i interface] [-f frequency] [-p port] [-D device]\n\n", *argv);
 			fprintf(stderr, "          -v: verbosity, increase verbosity by adding more v's\n");
 			fprintf(stderr, "          -V: vendor ID, use to select the desired FTDI device if multiple on host. (default = 0x0403)\n");
 			fprintf(stderr, "          -P: product ID, use to select the desired FTDI device if multiple on host. (default = 0x6010)\n");
@@ -366,6 +377,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "              and product IDs on host. Can be used instead of -S but -S is more definitive. (default = 0)\n");
 			fprintf(stderr, "          -i: interface, select which \'port\' on the selected device to use if multiple port device. (default = 0)\n");
 			fprintf(stderr, "          -f: frequency in Hz, force TCK frequency. If set to 0, set from settck commands sent by client. (default = 0)\n");
+			fprintf(stderr, "          -D: device ID, use to select FT chip. Can be: FT2232C ; FT2232H (default = FT2232C)\n");
 			fprintf(stderr, "          -p: TCP port, TCP port to listen for connections from client (default = %d)\n\n", port);
 			return 1;
 		}
@@ -373,9 +385,10 @@ int main(int argc, char **argv)
 	if (vlevel > 0) 
 	{
 		printf ("verbosity level is %d\n", vlevel);
+		printf("Device id: %d\n", device);
 	}
 
-	if (io_init(vendor, product, serial, index, interface, frequency, vlevel))
+	if (io_init(vendor, product, serial, index, interface, frequency, vlevel, device))
 	{
 		fprintf(stderr, "io_init failed\n");
 		return 1;

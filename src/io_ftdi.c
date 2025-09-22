@@ -13,8 +13,11 @@
 #define PORT_TDI            0x02
 #define PORT_TDO            0x04
 #define PORT_TMS            0x08
-#define PORT_MISC           0x90
-#define IO_OUTPUT (PORT_MISC|PORT_TCK|PORT_TDI|PORT_TMS)
+#define PORT_MISC_C         0x90
+#define PORT_MISC_H         0x80 // Put ADBUS4 pin in High Z
+
+#define IO_OUTPUT_C (PORT_MISC_C|PORT_TCK|PORT_TDI|PORT_TMS)
+#define IO_OUTPUT_H (PORT_MISC_H|PORT_TCK|PORT_TDI|PORT_TMS)
 
 #define IO_DEFAULT_OUT     (0xe0)               /* Found to work best for some FTDI implementations */
 
@@ -67,7 +70,7 @@ void io_close(void);
 //
 // verbosity: 0 means no output, increase from 0 for more and more debugging output
 //
-int io_init(int vendor, int product, const char* serial, unsigned int index, unsigned int interface, unsigned long frequency, int verbosity)
+int io_init(int vendor, int product, const char* serial, unsigned int index, unsigned int interface, unsigned long frequency, int verbosity, int device)
 {
 	int res;
 	unsigned char buf[1];
@@ -131,7 +134,13 @@ int io_init(int vendor, int product, const char* serial, unsigned int index, uns
 	}
 
 	ftdi_set_bitmode(&ftdi, 0xFF, BITMODE_CBUS);
-	res = ftdi_set_bitmode(&ftdi, IO_OUTPUT, BITMODE_SYNCBB);
+
+	uint8_t io_output = IO_OUTPUT_C;
+
+	if (device == 1)
+		io_output = IO_OUTPUT_H;
+
+	res = ftdi_set_bitmode(&ftdi, io_output, BITMODE_SYNCBB);
 	
 	if (res < 0)
 	{
